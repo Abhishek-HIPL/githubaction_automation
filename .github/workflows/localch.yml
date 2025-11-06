@@ -35,46 +35,41 @@ jobs:
           sudo apt update
           sudo apt install -y microsoft-edge-stable || echo "⚠️ Edge install skipped"
 
-          # --- Install Google Chrome (as fallback) ---
+          # --- Install Chrome (fallback) ---
           wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo apt install -y ./google-chrome-stable_current_amd64.deb || echo "⚠️ Chrome install skipped"
 
-      - name: Install Edge WebDriver (robust fallback)
+      - name: Install Edge WebDriver (manual fallback-safe)
         run: |
           set -e
-          echo "🧩 Checking Microsoft Edge version..."
           EDGE_VERSION=$(microsoft-edge-stable --version | awk '{print $3}' || echo "")
-          
-          if [ -z "$EDGE_VERSION" ]; then
-            echo "⚠️ Edge not found. Skipping to Chrome setup."
-            exit 0
-          fi
+          echo "Detected Edge version: $EDGE_VERSION"
 
           MAJOR_VERSION=$(echo "$EDGE_VERSION" | cut -d'.' -f1)
-          echo "Detected Edge version: $EDGE_VERSION (major $MAJOR_VERSION)"
+          echo "Major version: $MAJOR_VERSION"
 
           DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE_${MAJOR_VERSION}" | tr -d '\r\n')
 
           if [ -z "$DRIVER_VERSION" ]; then
-            echo "⚠️ Could not fetch version-specific driver, using latest stable."
-            DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE" | tr -d '\r\n')
+            echo "⚠️ Could not fetch version-specific driver — forcing previous stable (141.0.3537.99)"
+            DRIVER_VERSION="141.0.3537.99"
           fi
 
-          echo "Resolved EdgeDriver version: $DRIVER_VERSION"
+          echo "Using EdgeDriver version: $DRIVER_VERSION"
           DRIVER_URL="https://msedgedriver.azureedge.net/${DRIVER_VERSION}/edgedriver_linux64.zip"
-          echo "Downloading EdgeDriver from: $DRIVER_URL"
+          echo "Downloading from: $DRIVER_URL"
 
-          wget -q "$DRIVER_URL" -O msedgedriver.zip || (echo "❌ EdgeDriver download failed, fallback to ChromeDriver"; exit 0)
-          unzip -q msedgedriver.zip
-          sudo mv msedgedriver /usr/local/bin/
-          chmod +x /usr/local/bin/msedgedriver
+          wget -q "$DRIVER_URL" -O msedgedriver.zip || (echo "❌ EdgeDriver download failed"; exit 0)
+          unzip -q msedgedriver.zip || echo "⚠️ Unzip issue ignored"
+          sudo mv msedgedriver /usr/local/bin/ || echo "⚠️ Move issue ignored"
+          chmod +x /usr/local/bin/msedgedriver || true
           msedgedriver --version || echo "⚠️ EdgeDriver check skipped"
 
       - name: Install ChromeDriver (only if Edge failed)
         run: |
           if ! command -v msedgedriver &> /dev/null
           then
-            echo "🚨 EdgeDriver not found — installing ChromeDriver as fallback"
+            echo "🚨 EdgeDriver not found — installing ChromeDriver fallback"
             CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d'.' -f1)
             DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}" || echo "")
             if [ -z "$DRIVER_VERSION" ]; then
