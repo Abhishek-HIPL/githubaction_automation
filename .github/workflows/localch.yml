@@ -34,7 +34,7 @@ jobs:
           sudo apt install -y microsoft-edge-stable
           microsoft-edge-stable --version
 
-      - name: Install Edge WebDriver (safe + clean version)
+      - name: Install Edge WebDriver (UTF-16 safe)
         run: |
           set -e
           EDGE_VERSION=$(microsoft-edge-stable --version | awk '{print $3}')
@@ -45,11 +45,18 @@ jobs:
 
           echo "Fetching driver info from new endpoint..."
           JSON_URL="https://msedgewebdriverstorage.blob.core.windows.net/edgewebdriver/LATEST_RELEASE_${MAJOR_VERSION}"
-          DRIVER_VERSION=$(curl -s $JSON_URL | tr -d '\0' | tr -d '\r' | tr -d '\n' | xargs)
+
+          # Download and convert possible UTF-16 -> UTF-8
+          curl -s "$JSON_URL" --output driver_version_raw.txt
+          iconv -f utf-16 -t utf-8 driver_version_raw.txt -o driver_version.txt 2>/dev/null || cp driver_version_raw.txt driver_version.txt
+
+          DRIVER_VERSION=$(cat driver_version.txt | tr -d '\0' | tr -d '\r' | tr -d '\n' | xargs)
 
           if [ -z "$DRIVER_VERSION" ]; then
-            echo "⚠️ Could not fetch version-specific driver. Using latest stable instead."
-            DRIVER_VERSION=$(curl -s "https://msedgewebdriverstorage.blob.core.windows.net/edgewebdriver/LATEST_RELEASE" | tr -d '\0' | tr -d '\r' | tr -d '\n' | xargs)
+            echo "⚠️ Could not fetch specific version. Using latest stable instead."
+            curl -s "https://msedgewebdriverstorage.blob.core.windows.net/edgewebdriver/LATEST_RELEASE" --output driver_version_raw.txt
+            iconv -f utf-16 -t utf-8 driver_version_raw.txt -o driver_version.txt 2>/dev/null || cp driver_version_raw.txt driver_version.txt
+            DRIVER_VERSION=$(cat driver_version.txt | tr -d '\0' | tr -d '\r' | tr -d '\n' | xargs)
           fi
 
           echo "Resolved driver version: $DRIVER_VERSION"
