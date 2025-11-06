@@ -34,40 +34,24 @@ jobs:
           sudo apt install -y microsoft-edge-stable
           microsoft-edge-stable --version
 
-      - name: Install Edge WebDriver (UTF-16 safe)
+      - name: Install Edge WebDriver (Stable & Safe)
         run: |
           set -e
-          EDGE_VERSION=$(microsoft-edge-stable --version | awk '{print $3}')
-          echo "Detected Edge version: $EDGE_VERSION"
+          echo "Fetching latest stable Edge WebDriver..."
+          
+          # Get the latest stable version
+          DRIVER_VERSION=$(curl -s https://msedgedriver.azureedge.net/LATEST_RELEASE | tr -d '\r\n')
+          echo "Latest EdgeDriver version: $DRIVER_VERSION"
 
-          MAJOR_VERSION=$(echo "$EDGE_VERSION" | cut -d'.' -f1)
-          echo "Major version: $MAJOR_VERSION"
+          # Download driver zip
+          wget -q "https://msedgedriver.azureedge.net/${DRIVER_VERSION}/edgedriver_linux64.zip" -O msedgedriver.zip
 
-          echo "Fetching driver info from new endpoint..."
-          JSON_URL="https://msedgewebdriverstorage.blob.core.windows.net/edgewebdriver/LATEST_RELEASE_${MAJOR_VERSION}"
-
-          # Download and convert possible UTF-16 -> UTF-8
-          curl -s "$JSON_URL" --output driver_version_raw.txt
-          iconv -f utf-16 -t utf-8 driver_version_raw.txt -o driver_version.txt 2>/dev/null || cp driver_version_raw.txt driver_version.txt
-
-          DRIVER_VERSION=$(cat driver_version.txt | tr -d '\0' | tr -d '\r' | tr -d '\n' | xargs)
-
-          if [ -z "$DRIVER_VERSION" ]; then
-            echo "⚠️ Could not fetch specific version. Using latest stable instead."
-            curl -s "https://msedgewebdriverstorage.blob.core.windows.net/edgewebdriver/LATEST_RELEASE" --output driver_version_raw.txt
-            iconv -f utf-16 -t utf-8 driver_version_raw.txt -o driver_version.txt 2>/dev/null || cp driver_version_raw.txt driver_version.txt
-            DRIVER_VERSION=$(cat driver_version.txt | tr -d '\0' | tr -d '\r' | tr -d '\n' | xargs)
-          fi
-
-          echo "Resolved driver version: $DRIVER_VERSION"
-          DRIVER_URL="https://msedgedriver.azureedge.net/${DRIVER_VERSION}/edgedriver_linux64.zip"
-          echo "Downloading from: $DRIVER_URL"
-
-          wget -q "$DRIVER_URL" -O msedgedriver.zip || (echo "❌ Failed to download driver"; exit 1)
-          unzip -q msedgedriver.zip || (echo "⚠️ Unzip failed"; exit 0)
+          # Extract and install
+          unzip -q msedgedriver.zip
           sudo mv msedgedriver /usr/local/bin/
           chmod +x /usr/local/bin/msedgedriver
-          msedgedriver --version || echo "⚠️ EdgeDriver check skipped"
+          echo "Installed EdgeDriver version:"
+          msedgedriver --version
 
       - name: Run Automation Script
         env:
