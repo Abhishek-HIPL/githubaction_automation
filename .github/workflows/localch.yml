@@ -34,32 +34,29 @@ jobs:
           sudo apt install -y microsoft-edge-stable
           microsoft-edge-stable --version
 
-      - name: Install Edge WebDriver (Safe Auto Mode)
+      - name: Install Edge WebDriver (new reliable method)
         run: |
-          set +e
+          set -e
           EDGE_VERSION=$(microsoft-edge-stable --version | awk '{print $3}')
           echo "Detected Edge version: $EDGE_VERSION"
 
           MAJOR_VERSION=$(echo "$EDGE_VERSION" | cut -d'.' -f1)
           echo "Major version: $MAJOR_VERSION"
 
-          DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE_${MAJOR_VERSION}")
+          echo "Fetching driver info from new endpoint..."
+          JSON_URL="https://msedgewebdriverstorage.blob.core.windows.net/edgewebdriver/LATEST_RELEASE_${MAJOR_VERSION}"
+          DRIVER_VERSION=$(curl -s $JSON_URL)
+
           if [ -z "$DRIVER_VERSION" ]; then
-            echo "⚠️ Could not find version-specific driver, using latest stable"
-            DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE")
+            echo "⚠️ Could not fetch specific version. Using latest stable driver instead."
+            DRIVER_VERSION=$(curl -s "https://msedgewebdriverstorage.blob.core.windows.net/edgewebdriver/LATEST_RELEASE")
           fi
 
-          echo "Driver version resolved: $DRIVER_VERSION"
+          echo "Resolved driver version: $DRIVER_VERSION"
           DRIVER_URL="https://msedgedriver.azureedge.net/${DRIVER_VERSION}/edgedriver_linux64.zip"
-
           echo "Downloading from: $DRIVER_URL"
+
           wget -q "$DRIVER_URL" -O msedgedriver.zip
-
-          if [ ! -s msedgedriver.zip ]; then
-            echo "❌ Download failed or empty file. Exiting gracefully."
-            exit 0
-          fi
-
           unzip -q msedgedriver.zip || (echo "⚠️ Unzip failed"; exit 0)
           sudo mv msedgedriver /usr/local/bin/
           chmod +x /usr/local/bin/msedgedriver
