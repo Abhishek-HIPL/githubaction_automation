@@ -1,0 +1,48 @@
+name: Run Local.ch Automation
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # allows manual trigger from GitHub Actions tab
+
+jobs:
+  run-selenium:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Microsoft Edge
+        run: |
+          sudo apt update
+          sudo apt install -y wget gnupg software-properties-common
+          wget https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -
+          sudo add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/edge stable main"
+          sudo apt install -y microsoft-edge-stable
+
+      - name: Install Edge WebDriver
+        run: |
+          EDGE_VERSION=$(microsoft-edge --version | awk '{print $3}')
+          DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE")
+          wget "https://msedgedriver.azureedge.net/$DRIVER_VERSION/edgedriver_linux64.zip"
+          unzip edgedriver_linux64.zip
+          sudo mv msedgedriver /usr/local/bin/
+
+      - name: Run Automation Script
+        env:
+          MAILTRAP_USER: ${{ secrets.MAILTRAP_USER }}
+          MAILTRAP_PASS: ${{ secrets.MAILTRAP_PASS }}
+        run: |
+          python your_script_name.py
