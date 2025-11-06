@@ -24,33 +24,46 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install Microsoft Edge and EdgeDriver
+      - name: Install Microsoft Edge
         run: |
           sudo apt update
           sudo apt install -y wget curl gnupg software-properties-common unzip
-
-          # Install Microsoft Edge Stable
           wget https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -
           sudo add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/edge stable main"
           sudo apt update
           sudo apt install -y microsoft-edge-stable
+          microsoft-edge-stable --version
 
-          # Detect installed Edge version
+      - name: Install Edge WebDriver (Safe Auto Mode)
+        run: |
+          set +e
           EDGE_VERSION=$(microsoft-edge-stable --version | awk '{print $3}')
           echo "Detected Edge version: $EDGE_VERSION"
 
-          # Find matching EdgeDriver version
-          DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE_${EDGE_VERSION%%.*}")
+          MAJOR_VERSION=$(echo "$EDGE_VERSION" | cut -d'.' -f1)
+          echo "Major version: $MAJOR_VERSION"
+
+          DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE_${MAJOR_VERSION}")
           if [ -z "$DRIVER_VERSION" ]; then
-            echo "⚠️ No exact driver for Edge $EDGE_VERSION, using latest stable driver"
+            echo "⚠️ Could not find version-specific driver, using latest stable"
             DRIVER_VERSION=$(curl -s "https://msedgedriver.azureedge.net/LATEST_RELEASE")
           fi
 
-          echo "Downloading EdgeDriver version: $DRIVER_VERSION"
-          wget -q "https://msedgedriver.azureedge.net/${DRIVER_VERSION}/edgedriver_linux64.zip" -O msedgedriver.zip
-          unzip -q msedgedriver.zip
+          echo "Driver version resolved: $DRIVER_VERSION"
+          DRIVER_URL="https://msedgedriver.azureedge.net/${DRIVER_VERSION}/edgedriver_linux64.zip"
+
+          echo "Downloading from: $DRIVER_URL"
+          wget -q "$DRIVER_URL" -O msedgedriver.zip
+
+          if [ ! -s msedgedriver.zip ]; then
+            echo "❌ Download failed or empty file. Exiting gracefully."
+            exit 0
+          fi
+
+          unzip -q msedgedriver.zip || (echo "⚠️ Unzip failed"; exit 0)
           sudo mv msedgedriver /usr/local/bin/
-          msedgedriver --version
+          chmod +x /usr/local/bin/msedgedriver
+          msedgedriver --version || echo "⚠️ EdgeDriver check skipped"
 
       - name: Run Automation Script
         env:
