@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   run-selenium:
@@ -33,13 +33,22 @@ jobs:
           sudo apt update
           sudo apt install -y microsoft-edge-stable
 
-      - name: Install Edge WebDriver (matching version)
+      - name: Install Edge WebDriver (auto fallback)
         run: |
           EDGE_VERSION=$(microsoft-edge-stable --version | awk '{print $3}')
           echo "Detected Edge version: $EDGE_VERSION"
+          
           DRIVER_URL="https://msedgedriver.azureedge.net/${EDGE_VERSION}/edgedriver_linux64.zip"
-          echo "Downloading Edge WebDriver from: $DRIVER_URL"
-          wget -q "$DRIVER_URL" -O msedgedriver.zip || echo "Falling back to latest EdgeDriver"
+          wget -q --spider "$DRIVER_URL"
+          
+          if [ $? -ne 0 ]; then
+            echo "⚠️  Matching driver not found for Edge $EDGE_VERSION — using latest stable driver instead."
+            DRIVER_VERSION=$(curl -s https://msedgedriver.azureedge.net/LATEST_RELEASE)
+            DRIVER_URL="https://msedgedriver.azureedge.net/${DRIVER_VERSION}/edgedriver_linux64.zip"
+          fi
+          
+          echo "Downloading from: $DRIVER_URL"
+          wget -q "$DRIVER_URL" -O msedgedriver.zip
           unzip msedgedriver.zip
           sudo mv msedgedriver /usr/local/bin/
           msedgedriver --version
